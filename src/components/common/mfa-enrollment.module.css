@@ -1,0 +1,23 @@
+.container {
+  height: calc(100vh - var(--space-6));
+}
+
+.card {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.secret {
+  word-break: break-all;
+}
+
+.verifyForm {
+  width: 100%;
+}
+
+.codeInput {
+  width: 180px;
+  text-align: center;
+  letter-spacing: 4px;
+}

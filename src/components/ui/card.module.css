@@ -1,0 +1,24 @@
+.card {
+  border-radius: var(--radius-4);
+  background-color: var(--color-background);
+}
+
+.size-1 {
+  padding: var(--space-3);
+}
+.size-2 {
+  padding: var(--space-4);
+}
+.size-3 {
+  padding: var(--space-5);
+}
+
+.variant-surface {
+  border: 1px solid var(--gray-6);
+}
+.variant-classic {
+  box-shadow: var(--shadow-2);
+}
+.variant-ghost {
+  background-color: transparent;
+}

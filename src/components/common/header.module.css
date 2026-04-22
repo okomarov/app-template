@@ -1,0 +1,19 @@
+.header {
+  width: 100%;
+  z-index: 200;
+  height: var(--header-height);
+  flex-shrink: 0;
+  background-color: var(--gray-1);
+  border-bottom: 1px solid var(--gray-a5);
+  display: flex;
+}
+
+.headerContent {
+  width: 100%;
+  padding: var(--space-2) var(--space-6);
+  margin: 0 auto;
+
+  a {
+    line-height: 1;
+  }
+}

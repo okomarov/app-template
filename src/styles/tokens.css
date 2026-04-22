@@ -1,0 +1,160 @@
+/* Design tokens extracted from Radix Themes (scaling="95%", radius="small") */
+
+:root {
+  --scaling: 0.95;
+
+  --space-1: 3.8px;
+  --space-2: 7.6px;
+  --space-3: 11.4px;
+  --space-4: 15.2px;
+  --space-5: 22.8px;
+  --space-6: 30.4px;
+  --space-7: 38px;
+  --space-8: 45.6px;
+  --space-9: 60.8px;
+
+  --font-size-1: 11.4px;
+  --font-size-2: 13.3px;
+  --font-size-3: 15.2px;
+  --font-size-4: 17.1px;
+  --font-size-5: 19px;
+  --font-size-6: 22.8px;
+  --font-size-7: 26.6px;
+  --font-size-8: 33.25px;
+  --font-size-9: 57px;
+
+  --line-height-1: 15.2px;
+  --line-height-2: 19px;
+  --line-height-3: 22.8px;
+  --line-height-4: 24.7px;
+  --line-height-5: 26.6px;
+  --line-height-6: 28.5px;
+  --line-height-7: 34.2px;
+  --line-height-8: 38px;
+  --line-height-9: 57px;
+
+  --letter-spacing-1: 0.0025em;
+  --letter-spacing-2: 0em;
+  --letter-spacing-3: 0em;
+  --letter-spacing-4: -0.0025em;
+  --letter-spacing-5: -0.005em;
+  --letter-spacing-6: -0.00625em;
+  --letter-spacing-7: -0.0075em;
+  --letter-spacing-8: -0.01em;
+  --letter-spacing-9: -0.025em;
+
+  --radius-1: 2.1px;
+  --radius-2: 2.85px;
+  --radius-3: 4.3px;
+  --radius-4: 5.7px;
+  --radius-5: 8.55px;
+  --radius-6: 11.4px;
+  --radius-full: 9999px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-3: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-4: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-5: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  --shadow-6: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+
+  --accent-9: var(--blue-9);
+  --accent-10: var(--blue-10);
+  --accent-11: var(--blue-11);
+
+  --focus-8: var(--blue-8);
+
+  --color-background: #ffffff;
+  --color-surface: rgba(255, 255, 255, 0.8);
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --cursor-button: pointer;
+
+  --red-3: #feebec;
+  --red-4: #ffdbdc;
+  --red-7: #f4a9aa;
+  --red-9: #e5484d;
+  --red-10: #dc3e42;
+  --red-11: #ce2c31;
+  --red-12: #641723;
+
+  --green-3: #e6f6eb;
+  --green-4: #d6f1df;
+  --green-7: #8eceaa;
+  --green-9: #30a46c;
+  --green-10: #2b9a66;
+  --green-11: #218358;
+  --green-12: #193b2d;
+
+  --orange-3: #ffefd6;
+  --orange-4: #ffdfb5;
+  --orange-7: #f5ae73;
+  --orange-9: #f76b15;
+  --orange-10: #ef5f00;
+  --orange-11: #cc4e00;
+  --orange-12: #582d1d;
+
+  --yellow-3: #fff5c0;
+  --yellow-4: #ffee9c;
+  --yellow-7: #dbc44e;
+  --yellow-9: #ffe629;
+  --yellow-10: #f5d90a;
+  --yellow-11: #946800;
+
+  --purple-3: #f3e7fc;
+  --purple-4: #eddbf9;
+  --purple-7: #c89ef4;
+  --purple-9: #8e4ec6;
+  --purple-10: #8347b9;
+  --purple-11: #8145b5;
+
+  --header-height: 62px;
+}
+
+:root,
+.light,
+.light-theme {
+  --gray-1: #fcfcfd;
+  --gray-2: #f8f9fb;
+  --gray-3: #eeeff2;
+  --gray-4: #e6e8ec;
+  --gray-5: #dfe0e5;
+  --gray-6: #d7d8dd;
+  --gray-7: #ccced2;
+  --gray-8: #b9bbbf;
+  --gray-9: #8c8d91;
+  --gray-10: #818387;
+  --gray-11: #636468;
+  --gray-12: #1f2023;
+
+  --gray-a1: #00005503;
+  --gray-a2: #00256e07;
+  --gray-a3: #000f3c11;
+  --gray-a4: #00153e19;
+  --gray-a5: #00083020;
+  --gray-a7: #000a1e33;
+
+  --gray-contrast: #ffffff;
+
+  --blue-1: #fcfdff;
+  --blue-2: #f5faff;
+  --blue-3: #e9f2ff;
+  --blue-4: #d9eaff;
+  --blue-5: #c9dfff;
+  --blue-6: #b5d2ff;
+  --blue-7: #99bfff;
+  --blue-8: #73a4ff;
+  --blue-9: #0137ff;
+  --blue-10: #001aed;
+  --blue-11: #124cf5;
+  --blue-12: #0e2970;
+
+  --blue-a3: #0069ff16;
+  --blue-a4: #0073ff26;
+  --blue-a7: #005fff66;
+
+  --blue-contrast: #fff;
+}

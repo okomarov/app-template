@@ -1,0 +1,224 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-weight: 500;
+  border: none;
+  cursor: var(--cursor-button, pointer);
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background-color 0.1s,
+    color 0.1s,
+    box-shadow 0.1s,
+    opacity 0.1s;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue-8);
+    outline-offset: 1px;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+.size-1 {
+  height: var(--space-5);
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-1);
+  line-height: var(--line-height-1);
+  border-radius: var(--radius-2);
+}
+
+.size-2 {
+  height: var(--space-6);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-2);
+  line-height: var(--line-height-2);
+  border-radius: var(--radius-2);
+}
+
+.size-3 {
+  height: 38px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-3);
+  line-height: var(--line-height-3);
+  border-radius: var(--radius-3);
+}
+
+.size-4 {
+  height: 45.6px;
+  padding: 0 var(--space-5);
+  font-size: var(--font-size-4);
+  line-height: var(--line-height-4);
+  border-radius: var(--radius-3);
+}
+
+.radius-small {
+  border-radius: var(--radius-2);
+}
+.radius-medium {
+  border-radius: var(--radius-3);
+}
+.radius-large {
+  border-radius: var(--radius-4);
+}
+.radius-full {
+  border-radius: var(--radius-full);
+}
+
+.color-blue {
+  --btn-3: var(--blue-a3);
+  --btn-4: var(--blue-a4);
+  --btn-7: var(--blue-a7);
+  --btn-9: var(--blue-9);
+  --btn-10: var(--blue-10);
+  --btn-11: var(--blue-11);
+  --btn-12: var(--blue-12);
+  --btn-contrast: #fff;
+}
+
+.color-gray {
+  --btn-3: var(--gray-a3);
+  --btn-4: var(--gray-a4);
+  --btn-7: var(--gray-a7);
+  --btn-9: var(--gray-12);
+  --btn-10: var(--gray-11);
+  --btn-11: var(--gray-11);
+  --btn-12: var(--gray-12);
+  --btn-contrast: #fff;
+}
+
+.color-red {
+  --btn-3: var(--red-3);
+  --btn-4: var(--red-4);
+  --btn-7: var(--red-7);
+  --btn-9: var(--red-9);
+  --btn-10: var(--red-10);
+  --btn-11: var(--red-11);
+  --btn-12: var(--red-12);
+  --btn-contrast: #fff;
+}
+
+.color-green {
+  --btn-3: var(--green-3);
+  --btn-4: var(--green-4);
+  --btn-7: var(--green-7);
+  --btn-9: var(--green-9);
+  --btn-10: var(--green-10);
+  --btn-11: var(--green-11);
+  --btn-12: var(--green-12);
+  --btn-contrast: #fff;
+}
+
+.color-orange {
+  --btn-3: var(--orange-3);
+  --btn-4: var(--orange-4);
+  --btn-7: var(--orange-7);
+  --btn-9: var(--orange-9);
+  --btn-10: var(--orange-10);
+  --btn-11: var(--orange-11);
+  --btn-12: var(--orange-12);
+  --btn-contrast: #fff;
+}
+
+.color-yellow {
+  --btn-3: var(--yellow-3);
+  --btn-4: var(--yellow-4);
+  --btn-7: var(--yellow-7);
+  --btn-9: var(--yellow-9);
+  --btn-10: var(--yellow-10);
+  --btn-11: var(--yellow-11);
+  --btn-contrast: #fff;
+}
+
+.color-purple {
+  --btn-3: var(--purple-3);
+  --btn-4: var(--purple-4);
+  --btn-7: var(--purple-7);
+  --btn-9: var(--purple-9);
+  --btn-10: var(--purple-10);
+  --btn-11: var(--purple-11);
+  --btn-contrast: #fff;
+}
+
+.variant-solid {
+  background-color: var(--btn-9);
+  color: var(--btn-contrast);
+
+  &:hover:not(:disabled) {
+    background-color: var(--btn-10);
+  }
+  &:active:not(:disabled) {
+    background-color: var(--btn-12, var(--btn-10));
+  }
+}
+
+.variant-soft {
+  background-color: var(--btn-3);
+  color: var(--btn-11);
+
+  &:hover:not(:disabled) {
+    background-color: var(--btn-4);
+  }
+}
+
+.variant-outline {
+  background-color: transparent;
+  color: var(--btn-11);
+  box-shadow: inset 0 0 0 1px var(--btn-7);
+
+  &:hover:not(:disabled) {
+    background-color: var(--btn-3);
+  }
+}
+
+.variant-ghost {
+  background-color: transparent;
+  color: var(--btn-11);
+
+  &:hover:not(:disabled) {
+    background-color: var(--btn-3);
+  }
+}
+
+.variant-surface {
+  background-color: var(--color-surface);
+  color: var(--btn-11);
+  box-shadow: inset 0 0 0 1px var(--gray-a5);
+
+  &:hover:not(:disabled) {
+    background-color: var(--btn-3);
+  }
+}
+
+.loading {
+  position: relative;
+  color: transparent;
+
+  &::after {
+    content: "";
+    position: absolute;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
