@@ -1,5 +1,4 @@
-[project]
-id = "app-template"
+project_id = "app-template"
 
 [api]
 enabled = true

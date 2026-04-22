@@ -101,7 +101,13 @@ npm run db:push:staging           # Apply migrations to staging
 npm run db:push:prod              # Apply migrations to prod (user-only)
 ```
 
-**Verification**: `npx tsc --noEmit && npm run lint` — auto-enforced by the Stop hook, but run manually when iterating.
+### Verification Loop
+
+Three tiers, from automatic to on-demand:
+
+1. **Stop hook (automatic)** — runs `tsc --noEmit && biome check . && vitest run --project unit` after every task. Catches type errors, lint issues, and broken logic.
+2. **Integration tests (explicit)** — `npm run test:integration`. Run when changing queries, migrations, or auth logic. Requires local Supabase (`supabase start`).
+3. **Chrome DevTools (explicit)** — screenshot via chrome-devtools MCP after `npm run dev`. Run when changing components, layouts, or styles to verify visual correctness.
 
 ### Integration Testing
 

@@ -34,7 +34,8 @@
       },
       "style": {
         "noNonNullAssertion": "error",
-        "useConst": "error"
+        "useConst": "error",
+        "useImportType": "error"
       }
     }
   },
