@@ -121,7 +121,18 @@ npx vitest run --project integration src/lib/some-module.integration.test.ts  # 
 - **File naming**: `*.integration.test.ts`, co-located with the module under test.
 - **No mocking**: Call real production functions, not stubs.
 - **Factories**: `createTestUser`, etc. from `src/test/factories.ts`.
-- **`cleanTestData()`**: Truncates all rows in FK-safe order.
+- **`cleanTestData()`**: Truncates all rows in FK-safe order. **Refuses to run unless `DATABASE_URL` points at a database whose name ends in `_test`** — guard against accidentally wiping the dev DB.
+
+### Test database isolation
+
+Integration tests run against a separate `postgres_test` database in the same Supabase Postgres cluster, never the dev `postgres` database. Set up automatically:
+
+- Vitest `globalSetup` (`src/test/integration-setup.ts`) creates `postgres_test` if missing on every `npm run test:integration` invocation.
+- The setup stubs `auth.users` (so the bootstrap migration's FK resolves) and the `extensions` schema, then applies every `supabase/migrations/*.sql` in order.
+- Applied migration filenames are tracked in `public._test_migrations` so non-idempotent statements (e.g. `CREATE TRIGGER` without `DROP IF EXISTS`) only run once. Mirrors `supabase db push`.
+- The integration project's `DATABASE_URL` env hardcodes `…/postgres_test`. `cleanTestData()` additionally asserts the connection target ends in `_test` as defence in depth.
+
+When you add a new migration, it's picked up automatically on the next test run. To start from scratch, drop and recreate the test DB: `psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c "DROP DATABASE IF EXISTS postgres_test;"`.
 
 ## Key Directories
 

@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { defineConfig } from 'vitest/config'
+import { TEST_URL } from './src/test/test-db'
 
 const srcAlias = { '@': path.resolve(__dirname, 'src') }
 
@@ -31,8 +32,9 @@ export default defineConfig({
           testTimeout: 15000,
           pool: 'forks',
           fileParallelism: false,
+          globalSetup: ['./src/test/integration-setup.ts'],
           env: {
-            DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+            DATABASE_URL: TEST_URL,
             DB_SCHEMA: 'app',
           },
         },
