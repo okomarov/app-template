@@ -174,6 +174,10 @@ supabase/migrations/  # Hand-written SQL migration files
 
 ## Naming & Patterns
 
+### File Naming
+
+All source files use **kebab-case**: `application-card.tsx`, `use-current-user.ts`, `search-filters.module.css`. Single-word files are lowercase: `button.tsx`, `card.tsx`. Exported React components keep PascalCase symbol names (`export function ApplicationCard`) — only the filename is kebab-case. Exceptions: `CLAUDE.md`, `README.md`, and any other established convention from third-party tooling (e.g. Next.js layout/page filenames are already kebab-case).
+
 ### Function Naming
 
 | Prefix            | Use Case                          | Returns                   | Example                          |
