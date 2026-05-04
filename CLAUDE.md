@@ -270,6 +270,15 @@ SELECT cron.schedule(
 );
 ```
 
+## Commits
+
+- [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>)?: <summary>`, `!` for breaking.
+- Only commit when explicitly asked. Don't auto-commit.
+- Body explains the *why* — for `fix:` / `perf:`, the symptom and root cause; flag deliberate non-fixes as follow-ups.
+- Large coherent commits are fine; itemise sub-changes in the body and mark which are behaviour-changing. Don't bundle unrelated drive-bys.
+- `refactor:` only for zero-behaviour-change restructuring — anything observable is `feat:` / `fix:` / `perf:`.
+- Footers: `Fixes: <hash>` for regressions, `Refs: #N` for issue/PR links.
+
 ## Gotchas
 
 - **Never re-export types from `'use server'` files**: Turbopack resolves `export type { X }` as runtime values.
