@@ -13,6 +13,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
+export async function getCurrentUserWithMfaStatus(): Promise<{
+  user: AuthUser
+  mfaEnrolled: boolean
+} | null> {
+  try {
+    const user = await requireAuth()
+    const row = await db
+      .selectFrom('users')
+      .select('mfa_enrolled')
+      .where('guid', '=', user.guid)
+      .executeTakeFirst()
+    return { user, mfaEnrolled: row?.mfa_enrolled ?? false }
+  } catch {
+    return null
+  }
+}
+
 export async function getUsers() {
   await requireAuth()
   return db.selectFrom('users').selectAll().orderBy('name', 'asc').execute()

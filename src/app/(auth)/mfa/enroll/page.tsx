@@ -1,14 +1,9 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { getCurrentUserWithMfaStatus } from '@/app/actions/users'
+import { EnrollForm } from './enroll-form'
 
-import { useRouter } from 'next/navigation'
-import { MfaEnrollment } from '@/components/common/mfa-enrollment'
-
-export default function MfaEnroll() {
-  const router = useRouter()
-
-  const handleEnrollmentSuccess = () => {
-    router.push('/mfa')
-  }
-
-  return <MfaEnrollment onEnrollmentSuccess={handleEnrollmentSuccess} />
+export default async function MfaEnrollPage() {
+  const status = await getCurrentUserWithMfaStatus()
+  if (status?.mfaEnrolled) redirect('/')
+  return <EnrollForm />
 }
