@@ -10,14 +10,17 @@ export interface AuthUser {
   email: string
   name: string
   isAdmin: boolean
+  mfaEnrolled: boolean
 }
 
 export type AuthErrorCode = 'NO_CLAIMS' | 'NO_APP_USER' | 'INACTIVE' | 'MFA_REQUIRED'
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode
-  constructor(code: AuthErrorCode, message?: string) {
-    super(message ?? code)
+  // Default message is generic so server actions that propagate this error don't
+  // leak the discriminator to the client. Inspect `err.code` server-side.
+  constructor(code: AuthErrorCode, message = 'Unauthorized') {
+    super(message)
     this.name = 'AuthError'
     this.code = code
   }
@@ -41,9 +44,8 @@ export const requireAuth = cache(async function requireAuth(): Promise<AuthUser>
       // admin API (only writes auth.users) and never gets a corresponding
       // app-level row from the signup action.
       console.warn(
-        `[requireAuth] Supabase claims valid for sub=${data.claims.sub} (${data.claims.email}) ` +
-          `but no row in users. Likely created via Supabase Studio/admin API ` +
-          `instead of the signup flow.`,
+        `[requireAuth] Supabase claims valid for sub=${data.claims.sub} but no row in users. ` +
+          `Likely created via Supabase Studio/admin API instead of the signup flow.`,
       )
     }
     throw new AuthError('NO_APP_USER')
@@ -59,6 +61,7 @@ export const requireAuth = cache(async function requireAuth(): Promise<AuthUser>
     email: user.email,
     name: user.name,
     isAdmin: user.is_admin,
+    mfaEnrolled: user.mfa_enrolled,
   }
 })
 

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
-import { getCurrentUserWithMfaStatus } from '@/app/actions/users'
+import { getCurrentUser } from '@/app/actions/users'
 import { EnrollForm } from './enroll-form'
 
 export default async function MfaEnrollPage() {
-  const status = await getCurrentUserWithMfaStatus()
-  if (status?.mfaEnrolled) redirect('/')
+  const user = await getCurrentUser()
+  if (user?.mfaEnrolled) redirect('/')
   return <EnrollForm />
 }
