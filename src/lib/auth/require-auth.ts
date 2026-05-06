@@ -1,4 +1,5 @@
 import 'server-only'
+import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { authDb } from '@/db'
 import { SKIP_MFA } from '@/lib/constants/auth'
@@ -13,7 +14,7 @@ export interface AuthUser {
   mfaEnrolled: boolean
 }
 
-export type AuthErrorCode = 'NO_CLAIMS' | 'NO_APP_USER' | 'INACTIVE' | 'MFA_REQUIRED'
+export type AuthErrorCode = 'NO_CLAIMS' | 'NO_APP_USER' | 'INACTIVE'
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode
@@ -51,8 +52,12 @@ export const requireAuth = cache(async function requireAuth(): Promise<AuthUser>
     throw new AuthError('NO_APP_USER')
   }
   if (!user.active) throw new AuthError('INACTIVE')
+
+  // Per Supabase guidance: redirect aal1 sessions with enrolled MFA to the
+  // challenge instead of returning 401/403. Tabs left open mid-flow are common
+  // and a hard error would feel broken.
   if (!SKIP_MFA && user.mfa_enrolled && data.claims.aal !== 'aal2') {
-    throw new AuthError('MFA_REQUIRED')
+    redirect('/mfa')
   }
 
   return {
@@ -69,4 +74,22 @@ export async function requireAdmin(): Promise<AuthUser> {
   const user = await requireAuth()
   if (!user.isAdmin) throw new Error('Forbidden')
   return user
+}
+
+// Returns the current user or null when no auth claim exists. Lets redirect
+// errors from requireAuth (the MFA gate) bubble up so partially-authed users
+// always finish the challenge before browsing.
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  try {
+    return await requireAuth()
+  } catch (err) {
+    if (err instanceof AuthError) return null
+    throw err
+  }
+}
+
+// Auth pages: bounce already-authenticated users away from the form.
+export async function requireAnonymous(redirectTo = '/'): Promise<void> {
+  const user = await getCurrentUser()
+  if (user) redirect(redirectTo)
 }

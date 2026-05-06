@@ -4,16 +4,19 @@ import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { updatePasswordAction } from '@/app/actions/users'
 import { Button, Flex, Text, TextField } from '@/components/ui'
 import { SKIP_MFA } from '@/lib/constants/auth'
 import { supabase } from '@/lib/supabase/client'
 import styles from '../login/login.module.css'
 
+// Strict policy: any verified TOTP factor forces MFA before password change,
+// regardless of `nextLevel` (recovery sessions don't always promote it).
 async function redirectIfMfaRequired(router: ReturnType<typeof useRouter>): Promise<boolean> {
   if (SKIP_MFA) return false
 
-  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-  if (!data || data.currentLevel === 'aal2' || data.nextLevel !== 'aal2') return false
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.currentLevel === 'aal2') return false
 
   const { data: factors } = await supabase.auth.mfa.listFactors()
   const totp = factors?.totp?.find((f) => f.status === 'verified')
@@ -96,8 +99,8 @@ export default function ResetPassword() {
     e.preventDefault()
     setError('')
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long')
       return
     }
 
@@ -109,13 +112,13 @@ export default function ResetPassword() {
     setIsSubmitting(true)
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password })
-      if (updateError) {
-        setError(updateError.message || 'Failed to update password')
+      const result = await updatePasswordAction(password)
+      if (!result.ok) {
+        setError(result.error)
       } else {
         setSuccess(true)
         await supabase.auth.signOut()
-        setTimeout(() => router.push('/login'), 2000)
+        router.replace('/login')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')

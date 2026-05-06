@@ -1,12 +1,21 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Flex, Text, TextField } from '@/components/ui'
+import { safeReturnTo } from '@/lib/auth/safe-return-to'
 import { supabase } from '@/lib/supabase/client'
 import styles from '../login/login.module.css'
 
-export default function MfaVerify() {
+export default function MfaVerifyPage() {
+  return (
+    <Suspense>
+      <MfaVerify />
+    </Suspense>
+  )
+}
+
+function MfaVerify() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
@@ -16,13 +25,27 @@ export default function MfaVerify() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const paramFactorId = searchParams.get('factorId')
-    if (paramFactorId) {
-      setFactorId(paramFactorId)
-      inputRef.current?.focus()
-      return
-    }
-    supabase.auth.mfa.listFactors().then(({ data, error: factorsError }) => {
+    let cancelled = false
+
+    async function resolveFactor() {
+      // If the session is already aal2 (e.g. just completed enrollment),
+      // skip the challenge and forward to the original destination.
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (cancelled) return
+      if (aal?.currentLevel === 'aal2') {
+        router.replace(safeReturnTo(searchParams.get('returnTo')))
+        return
+      }
+
+      const paramFactorId = searchParams.get('factorId')
+      if (paramFactorId) {
+        setFactorId(paramFactorId)
+        inputRef.current?.focus()
+        return
+      }
+
+      const { data, error: factorsError } = await supabase.auth.mfa.listFactors()
+      if (cancelled) return
       if (factorsError || !data?.totp?.length) {
         router.replace('/login')
         return
@@ -34,7 +57,13 @@ export default function MfaVerify() {
       }
       setFactorId(totp.id)
       inputRef.current?.focus()
-    })
+    }
+
+    resolveFactor()
+
+    return () => {
+      cancelled = true
+    }
   }, [router, searchParams])
 
   const submitCode = useCallback(async () => {
@@ -46,11 +75,12 @@ export default function MfaVerify() {
       const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId, code })
       if (verifyError) throw verifyError
 
-      const rawReturn = searchParams.get('returnTo')
-      const returnTo = rawReturn?.startsWith('/') && !rawReturn.startsWith('//') ? rawReturn : '/'
-      router.push(returnTo)
+      router.push(safeReturnTo(searchParams.get('returnTo')))
     } catch {
       setError('Invalid MFA code')
+      // Clear the input so the auto-submit effect doesn't re-fire the same wrong
+      // code on next render and rate-limit the user out.
+      setCode('')
     } finally {
       setIsVerifying(false)
     }

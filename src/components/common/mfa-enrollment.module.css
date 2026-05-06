@@ -10,6 +10,22 @@
 
 .secret {
   word-break: break-all;
+  text-align: center;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: 0.04em;
+}
+
+.qr {
+  width: 200px;
+  height: 200px;
+  margin: var(--space-3) 0;
+}
+
+.qr svg,
+.qr img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .verifyForm {

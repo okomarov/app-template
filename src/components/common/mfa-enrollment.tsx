@@ -1,65 +1,80 @@
-import { useCallback, useEffect, useState } from 'react'
-import { updateUserMfaEnrolledStatus } from '@/app/actions/users'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { markUserMfaEnrolled } from '@/app/actions/users'
 import { Button, Card, Flex, Text, TextField } from '@/components/ui'
 import { supabase } from '@/lib/supabase/client'
 import styles from './mfa-enrollment.module.css'
 
 interface MfaEnrollmentProps {
-  onEnrollmentSuccess: (enrolledFactorId: string) => Promise<void> | void
+  onEnrollmentSuccess: () => Promise<void> | void
+}
+
+// Supabase returns the QR as `data:image/svg+xml;utf-8,<svg …>` — a
+// non-standard data URI that browsers won't render via <img src>.
+// Re-encode to a spec-compliant URL form so we can use a plain <img>.
+function normalizeQrSrc(qrCode: string): string {
+  const inline = qrCode.split('data:image/svg+xml;utf-8,')[1]
+  if (!inline) return qrCode
+  return `data:image/svg+xml,${encodeURIComponent(inline)}`
 }
 
 export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
-  const [step, setStep] = useState<'enrolling' | 'showing' | 'verifying' | 'success'>('enrolling')
+  const [step, setStep] = useState<'loading' | 'ready' | 'success'>('loading')
   const [factorId, setFactorId] = useState<string | null>(null)
-  const [challengeId, setChallengeId] = useState<string | null>(null)
-  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [qrSrc, setQrSrc] = useState<string | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const startEnrollment = useCallback(async () => {
-    setStep('enrolling')
-    setError(null)
-    setLoading(true)
-    try {
-      const { data: listData } = await supabase.auth.mfa.listFactors()
-      const unverified = (listData?.all ?? []).filter(
-        (f) => f.factor_type === 'totp' && f.status === 'unverified',
-      )
-      await Promise.all(
-        unverified.map((f) => supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {})),
-      )
+  // React 19 Strict Mode double-invokes effects; we must not re-issue
+  // enroll/unenroll calls (Supabase factors are real side-effects).
+  const enrolledOnce = useRef(false)
 
-      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
-        factorType: 'totp',
-        friendlyName: `totp-${Date.now()}`,
-      })
-      if (enrollError) throw enrollError
-      if (!data) throw new Error('No data returned from enrollment')
+  useEffect(() => {
+    if (enrolledOnce.current) return
+    enrolledOnce.current = true
 
-      setFactorId(data.id)
-      setQrCode(data.totp.qr_code)
-      setSecret(data.totp.secret)
-      setStep('showing')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start MFA enrollment.')
-    } finally {
-      setLoading(false)
+    let cancelled = false
+
+    async function startEnrollment() {
+      try {
+        const { data: listData } = await supabase.auth.mfa.listFactors()
+        const unverified = (listData?.all ?? []).filter(
+          (f) => f.factor_type === 'totp' && f.status === 'unverified',
+        )
+        await Promise.all(
+          unverified.map((f) => supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {})),
+        )
+
+        const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+          factorType: 'totp',
+          friendlyName: `totp-${Date.now()}`,
+        })
+        if (cancelled) return
+        if (enrollError) throw enrollError
+        if (!data) throw new Error('No data returned from enrollment')
+
+        setFactorId(data.id)
+        setQrSrc(normalizeQrSrc(data.totp.qr_code))
+        setSecret(data.totp.secret)
+        setStep('ready')
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : 'Failed to start MFA enrollment.')
+      }
+    }
+
+    startEnrollment()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  useEffect(() => {
-    startEnrollment()
-  }, [startEnrollment])
-
-  const challengeAndVerify = async () => {
-    if (!factorId) {
-      setError('Factor ID is missing. Please try enrolling again.')
-      return
-    }
+  const verifyCode = useCallback(async () => {
+    if (!factorId) return
     setError(null)
-    setLoading(true)
+    setSubmitting(true)
     try {
       const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
         factorId,
@@ -67,62 +82,36 @@ export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
       if (challengeError) throw challengeError
       if (!challengeData) throw new Error('No challenge data returned')
 
-      setChallengeId(challengeData.id)
-      setStep('verifying')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to challenge MFA factor.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const submitCode = useCallback(async () => {
-    if (!challengeId || !factorId) {
-      setError('Challenge or Factor ID is missing. Please try again.')
-      return
-    }
-    setError(null)
-    setLoading(true)
-    try {
-      const { error: verifyError } = await supabase.auth.mfa.verify({ factorId, challengeId, code })
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code,
+      })
       if (verifyError) throw verifyError
 
-      await updateUserMfaEnrolledStatus(true)
-
+      const synced = await markUserMfaEnrolled()
+      if (!synced.ok) throw new Error(synced.error)
       setStep('success')
-      await onEnrollmentSuccess(factorId)
+      await onEnrollmentSuccess()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify code.')
+      // Clear the input so the auto-submit effect doesn't immediately
+      // re-fire with the same wrong code once submitting flips back to false.
+      setCode('')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
-  }, [challengeId, factorId, code, onEnrollmentSuccess])
-
-  const handleVerifySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await submitCode()
-  }
+  }, [factorId, code, onEnrollmentSuccess])
 
   useEffect(() => {
-    if (step === 'verifying' && code.length === 6 && !loading && challengeId && factorId) {
-      submitCode()
+    if (step === 'ready' && code.length === 6 && !submitting) {
+      verifyCode()
     }
-  }, [code, step, loading, challengeId, factorId, submitCode])
+  }, [code, step, submitting, verifyCode])
 
-  // Supabase MFA enroll returns QR as a data:image/svg+xml;utf-8 URI.
-  // Extract the SVG and render it. Content is from Supabase's trusted API, not user input.
-  const renderQrCode = () => {
-    if (!qrCode) return null
-    const svgContent = qrCode.split('data:image/svg+xml;utf-8,')[1]
-    // biome-ignore lint/performance/noImgElement: fallback for non-SVG QR from Supabase MFA API
-    if (!svgContent) return <img src={qrCode} alt="QR Code" width={200} height={200} />
-    return (
-      <div
-        style={{ width: 200, height: 200, margin: '16px 0' }}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG from Supabase's trusted MFA enrollment API
-        dangerouslySetInnerHTML={{ __html: svgContent }}
-      />
-    )
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void verifyCode()
   }
 
   return (
@@ -132,54 +121,59 @@ export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
           <Text size="5" weight="bold">
             Set Up Multi-Factor Authentication
           </Text>
-          {step === 'enrolling' && (
+
+          {step === 'loading' && (
             <Text size="3" color="gray">
-              Loading enrollment details...
+              Loading enrollment details…
             </Text>
           )}
-          {step === 'showing' && (
+
+          {step === 'ready' && (
             <>
-              <Text size="3">Scan this QR code with your authenticator app:</Text>
-              {renderQrCode()}
-              <Text size="2">Or enter this secret manually:</Text>
-              <Text size="3" weight="bold" className={styles.secret}>
-                {secret}
+              <Text size="3" align="center">
+                Scan with your authenticator app, then enter the 6-digit code.
               </Text>
-              <Button variant="outline" onClick={challengeAndVerify} disabled={loading} size="3">
-                Next: Enter Code
-              </Button>
+              {qrSrc && (
+                // biome-ignore lint/performance/noImgElement: SVG data URI from Supabase MFA API; next/image not needed
+                <img src={qrSrc} alt="MFA enrollment QR code" className={styles.qr} />
+              )}
+              <Flex direction="column" gap="1" align="center">
+                <Text size="2" color="gray">
+                  Or enter this secret manually:
+                </Text>
+                <Text size="2" weight="bold" className={styles.secret}>
+                  {secret}
+                </Text>
+              </Flex>
+              <form onSubmit={handleSubmit} className={styles.verifyForm}>
+                <Flex direction="column" gap="3" align="center">
+                  <TextField.Root
+                    size="3"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    required
+                    autoFocus
+                    className={styles.codeInput}
+                  />
+                  <Button size="3" type="submit" loading={submitting} disabled={code.length !== 6}>
+                    Verify
+                  </Button>
+                </Flex>
+              </form>
             </>
           )}
-          {step === 'verifying' && (
-            <form onSubmit={handleVerifySubmit} className={styles.verifyForm}>
-              <Flex direction="column" gap="3" align="center">
-                <Text size="3">Enter the 6-digit code from your authenticator app:</Text>
-                <TextField.Root
-                  size="3"
-                  type="text"
-                  placeholder="MFA code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                  autoFocus
-                  className={styles.codeInput}
-                />
-                <Button
-                  size="3"
-                  type="submit"
-                  loading={loading}
-                  disabled={code.trim().length === 0}
-                >
-                  Verify
-                </Button>
-              </Flex>
-            </form>
-          )}
+
           {step === 'success' && (
             <Text color="green" size="4" weight="bold">
               MFA enrollment complete! You can now use your authenticator app to log in.
             </Text>
           )}
+
           {error && (
             <Text color="red" size="2" align="center">
               {error}

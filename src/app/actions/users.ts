@@ -2,15 +2,15 @@
 
 import { z } from 'zod'
 import { db } from '@/db'
-import { type AuthUser, requireAdmin, requireAuth } from '@/lib/auth/require-auth'
+import { type AuthUser, getCurrentUser, requireAdmin, requireAuth } from '@/lib/auth/require-auth'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  try {
-    return await requireAuth()
-  } catch {
-    return null
-  }
+// Server action wrapper for client callers (TanStack Query needs an action
+// endpoint). RSCs should import getCurrentUser from '@/lib/auth/require-auth'
+// directly to avoid the extra POST round-trip.
+export async function getCurrentUserAction(): Promise<AuthUser | null> {
+  return getCurrentUser()
 }
 
 export async function getUsers() {
@@ -18,19 +18,45 @@ export async function getUsers() {
   return db.selectFrom('users').selectAll().orderBy('name', 'asc').execute()
 }
 
-export async function updateUserMfaEnrolledStatus(mfaEnrolled: boolean) {
+// Sets `users.mfa_enrolled = true` after the client has verified a TOTP factor.
+// The flag is derived from Supabase's auth.mfa_factors (the source of truth per
+// Supabase docs); the action ignores any client input. This prevents a logged-in
+// user from POSTing `false` to silently disable their own MFA gate.
+export async function markUserMfaEnrolled(): Promise<{ ok: true } | { ok: false; error: string }> {
   const authUser = await requireAuth()
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.mfa.listFactors()
+  if (error) return { ok: false, error: 'Could not verify MFA factors.' }
+  const verified = (data?.totp ?? []).some((f) => f.status === 'verified')
+  if (!verified) return { ok: false, error: 'No verified MFA factor found.' }
   await db
     .updateTable('users')
-    .set({ mfa_enrolled: mfaEnrolled })
+    .set({ mfa_enrolled: true })
     .where('guid', '=', authUser.guid)
     .execute()
+  return { ok: true }
+}
+
+// Server-side password update used by the recovery flow. requireAuth redirects
+// MFA-enrolled aal1 sessions to /mfa, so an attacker can't bypass the second
+// factor by calling supabase.auth.updateUser directly from a recovery session.
+export async function updatePasswordAction(
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return { ok: false, error: 'Password must be at least 8 characters.' }
+  }
+  await requireAuth()
+  const supabase = await createClient()
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
 }
 
 const createUserSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   isAdmin: z.boolean().optional().default(false),
 })
 
