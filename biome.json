@@ -27,7 +27,10 @@
       },
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": {
+          "level": "warn",
+          "fix": "none"
+        }
       },
       "suspicious": {
         "noExplicitAny": "error"
