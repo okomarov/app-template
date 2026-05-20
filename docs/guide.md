@@ -182,6 +182,35 @@ export async function GET(request: Request) {
 }
 ```
 
+### Hosted Supabase URL configuration
+
+The Supabase Auth allow-list governs every email flow — confirmation, magic links, OAuth callbacks, password reset. The redirect URLs in `supabase/config.toml` only affect local Supabase; the hosted project must be configured in the dashboard at **Auth → URL Configuration**.
+
+**Site URL**: the production URL, e.g. `https://my-app.vercel.app`.
+
+**Redirect URLs** (add one per row):
+
+- `https://<prod-host>/**` — production
+- `http://localhost:3000/**` — local dev against the hosted project
+- `https://<project>-*.vercel.app/**` — Vercel preview deploys (optional, broad — allow-lists every current and future preview)
+
+Wildcard syntax: `**` matches any path including slashes; `*` matches a single path segment. The trailing `/**` is what lets auth callback paths match.
+
+### Seeding the first admin user
+
+The app has no public signup — rows in `app.users` are only created by the local bootstrap script or by the `createUser` admin action (which requires an existing admin). After deploying, the first user signed up via the Supabase dashboard will have an `auth.users` row but no app-level row, and `requireAuth()` will throw `AuthError('NO_APP_USER')`.
+
+Bootstrap the first admin once in the hosted SQL editor:
+
+```sql
+INSERT INTO app.users (guid, name, email, is_admin)
+SELECT id, 'Admin', email, true
+FROM auth.users
+WHERE email = '<your-email>';
+```
+
+Subsequent users can be invited from inside the app via the admin UI.
+
 ## Environment Variables
 
 | Variable | Description |
