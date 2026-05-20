@@ -97,6 +97,9 @@ done
 sed -i '' "s/title: 'App'/title: '${APP_TITLE}'/" src/app/layout.tsx
 sed -i '' "s/description: 'App description'/description: '${APP_TITLE}'/" src/app/layout.tsx
 
+# src/**/*.tsx — "App Name" wordmark in auth pages and header
+find src -name "*.tsx" -exec sed -i '' "s/App Name/${APP_TITLE}/g" {} +
+
 # CLAUDE.md — first line
 sed -i '' "1s/App Template/${APP_TITLE}/" CLAUDE.md
 
