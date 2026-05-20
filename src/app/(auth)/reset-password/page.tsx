@@ -2,7 +2,7 @@
 
 import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { updatePasswordAction } from '@/app/actions/users'
 import { Button, Flex, Text, TextField } from '@/components/ui'
@@ -36,54 +36,22 @@ export default function ResetPassword() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isValidatingToken, setIsValidatingToken] = useState(true)
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const handlePasswordReset = async () => {
+    const validate = async () => {
       try {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        let accessToken = hashParams.get('access_token')
-        let refreshToken = hashParams.get('refresh_token')
-        let type = hashParams.get('type')
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-        if (!accessToken) {
-          accessToken = searchParams.get('access_token')
-          refreshToken = searchParams.get('refresh_token')
-          type = searchParams.get('type')
+        if (!session) {
+          setError('Invalid or expired reset link. Please request a new one.')
+          setIsValidatingToken(false)
+          return
         }
 
-        if (type === 'recovery' && accessToken && refreshToken) {
-          const { error: sessionError, data: sessionData } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          })
-
-          if (sessionError) {
-            setError('Invalid or expired reset link. Please request a new one.')
-            setIsValidatingToken(false)
-            return
-          }
-
-          window.history.replaceState(null, '', window.location.pathname)
-
-          if (sessionData?.session) {
-            const redirected = await redirectIfMfaRequired(router)
-            if (redirected) return
-          }
-        } else {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
-
-          if (!session) {
-            setError('Invalid or expired reset link. Please request a new one.')
-            setIsValidatingToken(false)
-            return
-          }
-
-          const redirected = await redirectIfMfaRequired(router)
-          if (redirected) return
-        }
+        const redirected = await redirectIfMfaRequired(router)
+        if (redirected) return
 
         setIsValidatingToken(false)
       } catch (err) {
@@ -92,8 +60,8 @@ export default function ResetPassword() {
       }
     }
 
-    handlePasswordReset()
-  }, [searchParams, router])
+    validate()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
