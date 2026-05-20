@@ -4,14 +4,20 @@ CREATE SCHEMA IF NOT EXISTS app;
 
 CREATE EXTENSION IF NOT EXISTS "pg_jsonschema" SCHEMA extensions;
 
--- Shared trigger function for auto-updating updated_at
+-- Shared trigger function for auto-updating updated_at.
+-- search_path is pinned to '' to satisfy Supabase lint 0011 (function_search_path_mutable)
+-- and to prevent search_path-hijack attacks. now() lives in pg_catalog which is always
+-- on the search_path implicitly, so the empty setting is safe here.
 CREATE OR REPLACE FUNCTION app.set_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Users table: references auth.users via guid FK
 CREATE TABLE IF NOT EXISTS app.users (

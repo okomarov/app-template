@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Next.js application built from the shared app template. Uses Supabase (shared instance, schema-per-app isolation) with Kysely query builder.
+Next.js application built from the shared app template. See "Tech Stack" for the toolkit.
 
 ## Current Plan
 
@@ -50,6 +50,16 @@ This app uses its own Postgres schema within the shared Supabase instance. The s
 
 - **Never use `supabase db diff -f`** to generate migrations — it replays all migrations into a shadow DB (slow) and picks up pre-existing drift.
 - **Migrations must be idempotent** — use `IF EXISTS`, `IF NOT EXISTS`, or helper functions.
+- **Functions pin `search_path`** — `SET search_path = ''` in every `CREATE FUNCTION` (Supabase lint 0011).
+- **Extensions go in `extensions`, not `public`** — `CREATE EXTENSION ... SCHEMA extensions` (Supabase lint 0014).
+- **Enumerated columns use Postgres ENUMs**, not `TEXT + CHECK (col IN (...))` — finite vocabularies belong in the schema where type generators can see them:
+  ```sql
+  DO $$ BEGIN
+    CREATE TYPE app.scrape_status AS ENUM ('PENDING', 'RUNNING', 'DONE', 'ERROR');
+  EXCEPTION WHEN duplicate_object THEN null; END $$;
+  ```
+  - Add values: `ALTER TYPE … ADD VALUE`. Rename/remove: column-swap migration (rename column → new column with new enum → backfill → drop renamed column).
+  - `CHECK` constraints stay right for range checks (`age BETWEEN 0 AND 150`), cross-column conditions (`end_at > start_at`), and JSONB shape validation via `pg_jsonschema`.
 
 ### Index & Constraint Naming Convention
 
@@ -125,21 +135,18 @@ npx vitest run --project integration src/lib/some-module.integration.test.ts  # 
 
 ### Test database isolation
 
-Integration tests run against a separate `postgres_test` database in the same Supabase Postgres cluster, never the dev `postgres` database. Set up automatically:
+Integration tests use a separate `postgres_test` database (same Supabase cluster), auto-created and migrated by Vitest `globalSetup` in `src/test/integration-setup.ts`. New migrations are picked up on the next test run. To reset:
 
-- Vitest `globalSetup` (`src/test/integration-setup.ts`) creates `postgres_test` if missing on every `npm run test:integration` invocation.
-- The setup stubs `auth.users` (so the bootstrap migration's FK resolves) and the `extensions` schema, then applies every `supabase/migrations/*.sql` in order.
-- Applied migration filenames are tracked in `public._test_migrations` so non-idempotent statements (e.g. `CREATE TRIGGER` without `DROP IF EXISTS`) only run once. Mirrors `supabase db push`.
-- The integration project's `DATABASE_URL` env hardcodes `…/postgres_test`. `cleanTestData()` additionally asserts the connection target ends in `_test` as defence in depth.
-
-When you add a new migration, it's picked up automatically on the next test run. To start from scratch, drop and recreate the test DB: `psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c "DROP DATABASE IF EXISTS postgres_test;"`.
+```bash
+psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c "DROP DATABASE IF EXISTS postgres_test;"
+```
 
 ## Key Directories
 
 ```
 src/
   app/
-    actions/          # Server actions (thin wrappers over lib/ functions)
+    actions/          # Server actions
     api/              # API routes (webhooks, cron)
     (app)/            # Authenticated app routes
     (auth)/           # Auth pages (login, reset-password, mfa)
@@ -155,8 +162,8 @@ src/
     auth/             # Auth helpers (requireAuth, verifyCron)
     supabase/         # Supabase clients (browser, server, admin, proxy)
     constants/        # Shared constants and enum values
-    schemas/          # Shared Zod schemas (promote here when reused)
-    utils/            # Shared utility functions (promote here when reused)
+    schemas/          # Shared Zod schemas
+    utils/            # Shared utility functions
     [feature]/        # Domain logic (queries, operations, schemas, utils)
   styles/
     tokens.css        # Design tokens (spacing, font sizes, radii, shadows, colors)
@@ -169,19 +176,31 @@ supabase/migrations/  # Hand-written SQL migration files
 
 ## Coding Style & Principles
 
+**Foundations**
+
 - **Build only what is used**: No speculative endpoints, utilities, or full CRUD sets.
-- **Co-locate until reused**: Types and constants live in the feature directory (`src/lib/[feature]/`) that owns them. Only promote to a shared location (`src/lib/constants/`, etc.) when a second consumer appears.
+- **Co-locate until reused**: Types and constants live in the feature directory (`src/lib/[feature]/`) that owns them. Promote to a shared location only when a second consumer appears.
+- **Explicit over implicit**: Minimise the reader's inference. The cost of writing it down is paid once; the cost of inferring is paid forever.
+
+**Quality gates**
+
 - **Validate every boundary first (Zod)**: All external input at entry. Infer types from schemas (`z.infer`).
 - **Validate JSONB columns with `pg_jsonschema`**: Add `CHECK` constraints in migration SQL.
 - **Type safety without bypasses**: No `any`, non-null assertions, or unsafe casts.
+
+**Patterns**
+
 - **Thin server actions, reusable domain logic**: Server actions are orchestration-only. Core logic in `src/lib/`.
 - **Error returns**: Server actions return `{ error: 'message' }` for expected failures, throw for unexpected.
 - **Data integrity first**: No silent drops/skips. Use transactions for multi-table writes.
 - **Idempotent writes by default**: DB constraints + `onConflict` for replayable inserts.
-- **Constants and enums**: Constants: `UPPER_SNAKE_CASE`. Enum values: ALL_CAPS.
 - **Early return over deep nesting**: Guard clauses at the top.
-- **Comments**: Comment non-obvious intent/constraints ("why"), not literal code behavior.
-- **Tests that prove behavior**: Test transformations, branching, failure paths, idempotency.
+
+**Meta**
+
+- **Constants and enums**: Constants: `UPPER_SNAKE_CASE`. Enum values: `ALL_CAPS`.
+- **Comments**: Comment non-obvious intent/constraints ("why"), not literal code behaviour.
+- **Tests that prove behaviour**: Test transformations, branching, failure paths, idempotency.
 
 ## Naming & Patterns
 
