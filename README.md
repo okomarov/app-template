@@ -13,6 +13,7 @@ Next.js + Supabase application template. All apps share a single Supabase instan
 | `app-name` | Kebab-case name, e.g. `my-cool-app` (required) |
 | `--title` | App title for `<title>` tag (default: Title Case of app name) |
 | `--dest` | Destination directory (default: `../<app-name>`) |
+| `--monorepo` | Scaffold a Turborepo monorepo (`apps/<name>/`, workspaces) instead of a flat single-app layout |
 
 The script copies the template, customizes schema references, installs dependencies, starts local Supabase, runs migrations, and seeds an admin user with a random password.
 
@@ -50,4 +51,4 @@ Done! Created my-cool-app in ../my-cool-app
 - Biome linting/formatting, Vitest testing
 - Vercel deployment config with cron support
 
-See [docs/guide.md](docs/guide.md) for detailed documentation.
+See [docs/guide.md](docs/guide.md) for detailed documentation, or [docs/scale-to-monorepo.md](docs/scale-to-monorepo.md) when you outgrow a single app.

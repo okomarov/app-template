@@ -2,6 +2,15 @@
 
 Detailed documentation for apps created from the template. For quick start, see the [README](../README.md).
 
+## Working with Claude
+
+Agent guidance is split across two locations:
+
+- `CLAUDE.md` at the repo root — slim manifest, loads automatically at session start. Covers universal style, naming, commits, and orientation.
+- `.claude/rules/*.md` — domain-specific rules with a `paths:` frontmatter. Each rule loads on demand only when Claude touches a file matching its globs (e.g. `migrations.md` loads when editing `supabase/migrations/**`).
+
+To extend agent guidance, add a new file under `.claude/rules/` with the appropriate `paths:` glob. When the project outgrows a single app, see [scale-to-monorepo.md](scale-to-monorepo.md).
+
 ## Tech Stack
 
 | Layer | Technology |
