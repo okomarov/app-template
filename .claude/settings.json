@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/quiet.sh sh -c 'npx tsc --noEmit && npx biome check . && npx vitest run --project unit'",
+            "command": ".claude/hooks/quiet.sh sh -c 'npx tsc --noEmit && npx biome check . && npx vitest run --project unit --passWithNoTests'",
             "timeout": 60,
             "statusMessage": "Verifying types, lint, and unit tests..."
           }

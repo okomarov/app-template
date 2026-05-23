@@ -7,5 +7,5 @@
 #   quiet.sh sh -c 'cmd1 && cmd2'
 out=$("$@" 2>&1)
 rc=$?
-[ $rc -ne 0 ] && printf '%s\n' "$out"
+[ $rc -ne 0 ] && printf '%s\n' "$out" >&2
 exit $rc
