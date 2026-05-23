@@ -1,13 +1,10 @@
 'use server'
 
 import { z } from 'zod'
-import { db } from '@/db'
 import { isAllowedAuthEmail, normalizeAuthEmail } from '@/lib/auth/email'
-import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 const SIGNUP_SUCCESS_MESSAGE = 'Check your email to verify your account.'
-const DUPLICATE_EMAIL_ERROR = 'This email is already registered. Sign in or reset your password.'
 
 const signupSchema = z
   .object({
@@ -27,26 +24,12 @@ const signupSchema = z
 
 export type SignupResult = { ok: true; message: string } | { ok: false; error: string }
 
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    (err as { code: unknown }).code === '23505'
-  )
-}
-
-// Supabase signUp is enumeration-safe under PKCE + email confirmations: for an
-// existing email it returns a success response with `data.user.identities = []`
-// (rather than an error). Fresh signups always include one identity. Combined
-// with an app.users existence check by guid, we can both detect duplicates and
-// self-heal orphans (auth.users row from an interrupted signup that never got
-// its app.users counterpart).
-// https://supabase.com/docs/guides/auth/server-side/email-based-auth-with-pkce-flow-for-ssr
-function isExistingAuthUser(identities: { id?: string }[] | undefined): boolean {
-  return (identities?.length ?? 0) === 0
-}
-
+// Mirroring auth.users into app.users is handled by the on_auth_user_created
+// trigger (see migration 20260523004320_mirror_auth_users_via_trigger.sql), so
+// the action only validates input and calls signUp. Supabase obfuscates
+// duplicates by returning the same success shape with identities=[]; we
+// intentionally don't branch on that to preserve enumeration safety, which
+// matches the canonical Next.js pattern in Supabase's docs.
 export async function signUpAction(input: z.input<typeof signupSchema>): Promise<SignupResult> {
   const parsed = signupSchema.safeParse(input)
   if (!parsed.success) {
@@ -57,7 +40,7 @@ export async function signUpAction(input: z.input<typeof signupSchema>): Promise
   const email = normalizeAuthEmail(parsed.data.email)
 
   const supabase = await createClient()
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password: parsed.data.password,
     options: {
@@ -67,63 +50,8 @@ export async function signUpAction(input: z.input<typeof signupSchema>): Promise
     },
   })
 
-  if (authError) {
-    return { ok: false, error: authError.message || 'Could not create account.' }
-  }
-
-  const authUser = authData.user
-  if (!authUser) {
-    console.error('[signUp] supabase.auth.signUp returned no user for', email)
-    return { ok: false, error: 'Could not create account. Please try again.' }
-  }
-
-  const existingAuthUser = isExistingAuthUser(authUser.identities)
-
-  if (existingAuthUser) {
-    // Either a real duplicate or an orphan from a prior interrupted signup.
-    // Check our side: if we already have a users row, it's a duplicate; if
-    // not, self-heal by inserting the missing row using the existing guid.
-    const appRow = await db
-      .selectFrom('users')
-      .select('guid')
-      .where('guid', '=', authUser.id)
-      .executeTakeFirst()
-    if (appRow) {
-      return { ok: false, error: DUPLICATE_EMAIL_ERROR }
-    }
-    console.warn('[signUp] healing orphaned auth.users row', { email, guid: authUser.id })
-  }
-
-  try {
-    await db
-      .insertInto('users')
-      .values({
-        guid: authUser.id,
-        name: parsed.data.name,
-        email,
-      })
-      .execute()
-  } catch (err) {
-    if (isUniqueViolation(err)) {
-      // Concurrent signup raced us between the existence check and insert.
-      // The auth.users row is shared with the winner; do not delete it.
-      return { ok: false, error: DUPLICATE_EMAIL_ERROR }
-    }
-    console.error('[signUp] app.users insert failed for', email, err)
-    // Only roll back auth.users if WE created it on this call. Orphan-heal
-    // paths must not delete an auth user that pre-existed.
-    if (!existingAuthUser) {
-      try {
-        await supabaseAdmin().auth.admin.deleteUser(authUser.id)
-      } catch (cleanupErr) {
-        console.error(
-          '[signUp] CRITICAL: failed to delete orphaned auth.users row',
-          authUser.id,
-          cleanupErr,
-        )
-      }
-    }
-    return { ok: false, error: 'Could not create account. Please try again.' }
+  if (error) {
+    return { ok: false, error: error.message || 'Could not create account.' }
   }
 
   return { ok: true, message: SIGNUP_SUCCESS_MESSAGE }
