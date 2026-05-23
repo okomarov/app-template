@@ -13,8 +13,20 @@ major_version = 15
 enabled = true
 site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["http://127.0.0.1:3000/**", "http://localhost:3000/**"]
+# Mirrors the Zod min(8) in signUpAction.
+minimum_password_length = 8
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
-enable_confirmations = false
+enable_confirmations = true
+
+# Custom templates use {{ .TokenHash }} so links land on /auth/confirm
+# (verifyOtp) instead of the legacy /auth/v1/verify → ?code= bridge.
+[auth.email.template.confirmation]
+subject = "Confirm your account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/recovery.html"

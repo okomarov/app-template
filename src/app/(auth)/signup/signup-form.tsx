@@ -3,101 +3,92 @@
 import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { updatePasswordAction } from '@/app/actions/users'
+import { useState } from 'react'
+import { signUpAction } from '@/app/actions/auth'
 import { Button, Flex, Text, TextField } from '@/components/ui'
+import { isAllowedAuthEmail, nameFromEmail, normalizeAuthEmail } from '@/lib/auth/email'
 import { supabase } from '@/lib/supabase/client'
 import styles from '../login/login.module.css'
 
-// Strict policy: any verified TOTP factor forces MFA before password change,
-// regardless of `nextLevel` (recovery sessions don't always promote it).
-async function redirectIfMfaRequired(router: ReturnType<typeof useRouter>): Promise<boolean> {
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-  if (aal?.currentLevel === 'aal2') return false
-
-  const { data: factors } = await supabase.auth.mfa.listFactors()
-  const totp = factors?.totp?.find((f) => f.status === 'verified')
-  if (!totp) return false
-
-  router.replace(`/mfa?factorId=${totp.id}&returnTo=/reset-password`)
-  return true
+interface SignupFormProps {
+  initialEmail: string
 }
 
-export default function ResetPassword() {
+export function SignupForm({ initialEmail }: SignupFormProps) {
+  const normalizedInitialEmail = normalizeAuthEmail(initialEmail)
+  const [name, setName] = useState(nameFromEmail(normalizedInitialEmail))
+  const [email, setEmail] = useState(normalizedInitialEmail)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isValidatingToken, setIsValidatingToken] = useState(true)
+  const [isResending, setIsResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
+  const [resendError, setResendError] = useState('')
   const router = useRouter()
-
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!session) {
-          setError('Invalid or expired reset link. Please request a new one.')
-          setIsValidatingToken(false)
-          return
-        }
-
-        const redirected = await redirectIfMfaRequired(router)
-        if (redirected) return
-
-        setIsValidatingToken(false)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to validate reset link.')
-        setIsValidatingToken(false)
-      }
-    }
-
-    validate()
-  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const normalizedEmail = normalizeAuthEmail(email)
     setError('')
+    setSuccess('')
+
+    if (!isAllowedAuthEmail(normalizedEmail)) {
+      setError('Email domain is not allowed for signup.')
+      return
+    }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long')
+      setError('Password must be at least 8 characters.')
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError('Passwords do not match.')
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const result = await updatePasswordAction(password)
+      const result = await signUpAction({
+        name,
+        email: normalizedEmail,
+        password,
+        confirmPassword,
+      })
       if (!result.ok) {
         setError(result.error)
-      } else {
-        setSuccess(true)
-        await supabase.auth.signOut()
-        router.replace('/login')
+        return
       }
+      setEmail(normalizedEmail)
+      setSuccess(result.message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      setError(err instanceof Error ? err.message : 'Could not create account.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (isValidatingToken) {
-    return (
-      <Flex justify="center" align="center" className={styles.fullHeight}>
-        <Text>Validating reset link...</Text>
-      </Flex>
-    )
+  const handleResend = async () => {
+    setResendMessage('')
+    setResendError('')
+    setIsResending(true)
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email })
+      if (error) {
+        setResendError(error.message || 'Could not resend verification email.')
+      } else {
+        setResendMessage('Verification email sent.')
+      }
+    } catch (err) {
+      setResendError(err instanceof Error ? err.message : 'Could not resend verification email.')
+    } finally {
+      setIsResending(false)
+    }
   }
 
   return (
@@ -114,26 +105,70 @@ export default function ResetPassword() {
         </Text>
         <Flex direction="column" gap="4" className={styles.loginForm}>
           <Text size="5" weight="bold" align="center">
-            Set New Password
+            Create Account
           </Text>
           {success ? (
             <Flex direction="column" gap="3">
               <Text size="3" align="center" color="green">
-                Password updated successfully! Redirecting to login...
+                {success}
               </Text>
+              <Text size="2" color="gray" align="center">
+                Follow the verification link before signing in.
+              </Text>
+              {resendMessage && (
+                <Text size="2" color="green" align="center">
+                  {resendMessage}
+                </Text>
+              )}
+              {resendError && (
+                <Text size="2" color="red" align="center">
+                  {resendError}
+                </Text>
+              )}
+              <Button
+                size="3"
+                variant="soft"
+                onClick={handleResend}
+                disabled={isResending}
+                className={styles.fullWidth}
+              >
+                {isResending ? 'Sending...' : 'Resend verification email'}
+              </Button>
+              <Button size="3" onClick={() => router.push('/login')} className={styles.fullWidth}>
+                Back to Login
+              </Button>
             </Flex>
           ) : (
             <form onSubmit={handleSubmit}>
               <Flex direction="column" gap="3">
-                <Text size="2" color="gray" align="center">
-                  Please enter your new password below.
-                </Text>
+                <TextField.Root
+                  size="3"
+                  type="text"
+                  name="name"
+                  autoComplete="name"
+                  placeholder="Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
+                <TextField.Root
+                  size="3"
+                  type="email"
+                  name="username"
+                  autoComplete="username"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
                 <TextField.Root
                   size="3"
                   type={showPassword ? 'text' : 'password'}
                   name="new-password"
                   autoComplete="new-password"
-                  placeholder="New Password"
+                  placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -144,8 +179,8 @@ export default function ResetPassword() {
                       variant="ghost"
                       type="button"
                       tabIndex={-1}
-                      onClick={(e) => {
-                        e.preventDefault()
+                      onClick={(event) => {
+                        event.preventDefault()
                         setShowPassword(!showPassword)
                       }}
                       className={styles.passwordToggle}
@@ -160,7 +195,7 @@ export default function ResetPassword() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   name="confirm-password"
                   autoComplete="new-password"
-                  placeholder="Confirm New Password"
+                  placeholder="Confirm Password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
@@ -171,8 +206,8 @@ export default function ResetPassword() {
                       variant="ghost"
                       type="button"
                       tabIndex={-1}
-                      onClick={(e) => {
-                        e.preventDefault()
+                      onClick={(event) => {
+                        event.preventDefault()
                         setShowConfirmPassword(!showConfirmPassword)
                       }}
                       className={styles.passwordToggle}
@@ -190,13 +225,19 @@ export default function ResetPassword() {
                 <Button
                   size="3"
                   type="submit"
-                  disabled={!password.trim() || !confirmPassword.trim() || isSubmitting}
+                  disabled={
+                    !name.trim() ||
+                    !email.trim() ||
+                    !password.trim() ||
+                    !confirmPassword.trim() ||
+                    isSubmitting
+                  }
                   className={styles.fullWidth}
                 >
-                  {isSubmitting ? 'Updating...' : 'Update Password'}
+                  {isSubmitting ? 'Creating...' : 'Create Account'}
                 </Button>
                 <Flex justify="center">
-                  <Link href="/login" className="text-link">
+                  <Link href="/login" prefetch={false} className="text-link">
                     <Text size="2">Back to Login</Text>
                   </Link>
                 </Flex>

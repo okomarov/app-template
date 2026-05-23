@@ -21,10 +21,9 @@ export function ForgotPasswordForm() {
     setIsSubmitting(true)
 
     try {
-      const redirectUrl = `${window.location.origin}/reset-password`
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
-      })
+      // No redirectTo: the recovery email template uses {{ .SiteURL }} and
+      // hardcodes &next=/reset-password, so it controls the destination.
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
       if (error) {
         setError(error.message || 'Failed to send reset email')
       } else {
@@ -71,6 +70,8 @@ export function ForgotPasswordForm() {
                 <TextField.Root
                   size="3"
                   type="email"
+                  name="username"
+                  autoComplete="username"
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

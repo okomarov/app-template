@@ -205,6 +205,23 @@ The Supabase Auth allow-list governs every email flow — confirmation, magic li
 
 Wildcard syntax: `**` matches any path including slashes; `*` matches a single path segment. The trailing `/**` is what lets auth callback paths match.
 
+### Hosted Supabase email templates
+
+The signup and password-recovery flows use Supabase's [SSR PKCE pattern](https://supabase.com/docs/guides/auth/server-side/email-based-auth-with-pkce-flow-for-ssr): the email link points at `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=…&next=…` and our `/auth/confirm` route exchanges the token via `verifyOtp`. This requires custom email templates — Supabase's defaults use `{{ .ConfirmationURL }}` (the implicit/legacy flow) and won't work with `/auth/confirm`.
+
+The templates in `supabase/templates/*.html` are wired up via `supabase/config.toml` for local Supabase. **`supabase db push` does NOT upload email templates to hosted projects** — they must be installed once per hosted environment.
+
+Install on each hosted environment (staging, prod):
+
+1. Open the Supabase Dashboard → **Authentication → Email Templates**.
+2. For each template, paste the contents of the matching file:
+   - **Confirm signup** ← `supabase/templates/confirmation.html`
+   - **Reset password** ← `supabase/templates/recovery.html`
+3. Set the subject lines to match `supabase/config.toml` (`Confirm your account`, `Reset your password`).
+4. Save.
+
+Verify by triggering a signup or password-reset on the hosted environment and inspecting the email — the link should point at `/auth/confirm?token_hash=…`, not `/auth/v1/verify?token=…`.
+
 ### Seeding the first admin user
 
 The app has no public signup — rows in `app.users` are only created by the local bootstrap script or by the `createUser` admin action (which requires an existing admin). After deploying, the first user signed up via the Supabase dashboard will have an `auth.users` row but no app-level row, and `requireAuth()` will throw `AuthError('NO_APP_USER')`.

@@ -6,6 +6,10 @@ import styles from './mfa-enrollment.module.css'
 
 interface MfaEnrollmentProps {
   onEnrollmentSuccess: () => Promise<void> | void
+  // Optional Skip handler. When provided, renders a "Skip for now" button
+  // alongside Verify. The host is responsible for persisting the choice so
+  // the user isn't re-prompted on next sign-in.
+  onSkip?: () => Promise<void> | void
 }
 
 // Supabase returns the QR as `data:image/svg+xml;utf-8,<svg …>` — a
@@ -17,7 +21,8 @@ function normalizeQrSrc(qrCode: string): string {
   return `data:image/svg+xml,${encodeURIComponent(inline)}`
 }
 
-export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
+export function MfaEnrollment({ onEnrollmentSuccess, onSkip }: MfaEnrollmentProps) {
+  const [isSkipping, setIsSkipping] = useState(false)
   const [step, setStep] = useState<'loading' | 'ready' | 'success'>('loading')
   const [factorId, setFactorId] = useState<string | null>(null)
   const [qrSrc, setQrSrc] = useState<string | null>(null)
@@ -104,10 +109,10 @@ export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
   }, [factorId, code, onEnrollmentSuccess])
 
   useEffect(() => {
-    if (step === 'ready' && code.length === 6 && !submitting) {
+    if (step === 'ready' && code.length === 6 && !submitting && !isSkipping) {
       verifyCode()
     }
-  }, [code, step, submitting, verifyCode])
+  }, [code, step, submitting, isSkipping, verifyCode])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -163,6 +168,40 @@ export function MfaEnrollment({ onEnrollmentSuccess }: MfaEnrollmentProps) {
                   <Button size="3" type="submit" loading={submitting} disabled={code.length !== 6}>
                     Verify
                   </Button>
+                  {onSkip && (
+                    <Button
+                      size="3"
+                      variant="ghost"
+                      type="button"
+                      disabled={submitting || isSkipping}
+                      onClick={async () => {
+                        setError(null)
+                        setIsSkipping(true)
+                        try {
+                          // Drop the unverified factor created on mount so it
+                          // doesn't linger in auth.mfa_factors; the user is
+                          // opting out, not pausing mid-enrollment.
+                          if (factorId) {
+                            await supabase.auth.mfa
+                              .unenroll({ factorId })
+                              .catch((err) =>
+                                console.warn(
+                                  '[mfa.enroll] unenroll on skip failed (non-fatal)',
+                                  err,
+                                ),
+                              )
+                          }
+                          await onSkip()
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Failed to skip MFA setup.')
+                        } finally {
+                          setIsSkipping(false)
+                        }
+                      }}
+                    >
+                      {isSkipping ? 'Skipping...' : 'Skip for now'}
+                    </Button>
+                  )}
                 </Flex>
               </form>
             </>

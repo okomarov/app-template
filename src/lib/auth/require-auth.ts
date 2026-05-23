@@ -2,7 +2,6 @@ import 'server-only'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { authDb } from '@/db'
-import { SKIP_MFA } from '@/lib/constants/auth'
 import { createClient } from '@/lib/supabase/server'
 
 export interface AuthUser {
@@ -56,7 +55,7 @@ export const requireAuth = cache(async function requireAuth(): Promise<AuthUser>
   // Per Supabase guidance: redirect aal1 sessions with enrolled MFA to the
   // challenge instead of returning 401/403. Tabs left open mid-flow are common
   // and a hard error would feel broken.
-  if (!SKIP_MFA && user.mfa_enrolled && data.claims.aal !== 'aal2') {
+  if (user.mfa_enrolled && data.claims.aal !== 'aal2') {
     redirect('/mfa')
   }
 

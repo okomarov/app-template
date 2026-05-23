@@ -4,7 +4,7 @@
 const PLACEHOLDER_BASE = 'http://x.invalid'
 
 export function safeReturnTo(raw: string | null | undefined, fallback = '/'): string {
-  if (!raw || !raw.startsWith('/')) return fallback
+  if (!raw?.startsWith('/')) return fallback
   try {
     const parsed = new URL(raw, PLACEHOLDER_BASE)
     if (parsed.origin !== PLACEHOLDER_BASE) return fallback
